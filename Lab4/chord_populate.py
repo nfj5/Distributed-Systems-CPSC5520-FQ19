@@ -5,3 +5,8 @@ Collaborated with Pabi and
 :Authors: Nicholas Jones
 :Version: fq19-01
 """
+
+
+class ChordPopulate(object):
+    def __init__(self):
+        pass
