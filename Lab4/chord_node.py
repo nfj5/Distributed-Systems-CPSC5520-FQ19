@@ -150,8 +150,7 @@ class ChordNode(object):
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(node_addr)
-            self.finger.append(self.message(sock, Protocol.JOIN, self.listen_addr,
-                                            cfr=False))  # TODO update response to return the successor
+            self.finger.append(self.message(sock, Protocol.JOIN, self.listen_addr, cfr=True))  # TODO update response to return the successor
             print(self.finger[0])
 
     def message(self, conn, protocol, msg, buffer_size=BUFFER_SIZE, cfr=True):
