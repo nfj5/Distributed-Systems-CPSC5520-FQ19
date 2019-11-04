@@ -37,6 +37,8 @@ class ChordNode(object):
         self.successor = None
         self.node_id = self.get_node_id(self.listen_addr)
 
+        print("Generated Node ID: {}".format(self.node_id))
+
         # default interval = [node_id, node_id)
         self.start = self.node_id
         self.end = self.node_id
@@ -125,7 +127,7 @@ class ChordNode(object):
 
                 # finger[0].start of requester = requester.node_id + 1
                 node_id = self.get_node_id(msg) + 1
-                print("succ", self.find_successor(node_id))
+                print("Sent SUCCESSOR as", self.find_successor(node_id))
                 conn.sendall(pickle.dumps(self.find_successor(node_id)))
 
             elif protocol == Protocol.SUCCESSOR:
@@ -151,7 +153,7 @@ class ChordNode(object):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(node_addr)
             self.finger.append(self.message(sock, Protocol.JOIN, self.listen_addr, cfr=True))  # TODO update response to return the successor
-            print(self.finger[0])
+            print("Received SUCCESSOR as", self.finger[0])
 
     def message(self, conn, protocol, msg, buffer_size=BUFFER_SIZE, cfr=True):
         """
