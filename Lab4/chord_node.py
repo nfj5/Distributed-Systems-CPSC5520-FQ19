@@ -1,10 +1,12 @@
 """
 CPSC 5520, Seattle University
 This is free and unencumbered software released into the public domain.
-Collaborated with Pabi and Joe
+Collaborated with Pabi
 :Authors: Nicholas Jones
 :Version: fq19-01
 """
+
+# rewrite message to call_rpc
 
 import sys
 from enum import Enum
@@ -14,9 +16,12 @@ import socket
 import pickle
 import hashlib
 
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 4096
 HASH_BITS = 160  # SHA-1 is a 160-bit hashing algorithm
 MAX_KEY = 360
+
+FINGER_SIZE = 3
+# MAX_KEY = 2**FINGER_SIZE
 
 
 class Protocol(Enum):
@@ -44,6 +49,14 @@ class ChordNode(object):
         self.end = self.node_id
 
         self.finger_id = {'start': self.start, 'end': self.end, 'node_id': self.node_id, 'addr': self.listen_addr}
+        # finger_id = {start, interval, node}
+        # interval = [finger[k].start, finger[k+1]) - if k+1 > MAX_KEY, replace k+1 with me
+        # put garbage data in finger[0] - one-based table
+        # node = location of the first node in the interval
+        
+        # ChordNode objects
+        # successor = finger[1].node
+        # predecessor
 
     def run(self, node_addr):
         """
@@ -68,7 +81,7 @@ class ChordNode(object):
             self.join_network(node_addr)
 
     def get_node_id(self, addr):
-        return int(hashlib.sha1(pickle.dumps(addr)).hexdigest(), 16) % MAX_KEY
+        return int.from_bytes(hashlib.sha1(pickle.dumps(addr)).digest(), byteorder='little') % MAX_KEY
 
     def find_successor(self, node_id):
         node = self.find_predecessor(node_id)
@@ -81,7 +94,7 @@ class ChordNode(object):
         """
         other_node = self.finger_id
 
-        while not (other_node['start'] < node_id or node_id <= other_node['end']):
+        while not (other_node['start'] < node_id or (node_id <= other_node['end']) or other_node['start'] > other_node['end']):
             if other_node['node_id'] != self.node_id:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                     sock.connect(other_node['addr'])
