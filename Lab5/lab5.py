@@ -15,7 +15,9 @@ import struct
 import hashlib
 import binascii
 
-BTC_HOST = "42.60.217.183"
+BUFFER_SIZE = 4096
+
+BTC_HOST = "185.216.140.33"
 BTC_PORT = 8333
 VERSION = 70015
 
@@ -26,20 +28,57 @@ BLOCK_NUMBER = 2146346 % 600000
 
 
 def run():
-	message = get_version_message()
-	# print (len(message))
-	header = get_header("version", message)
+	# send the version message
+	ver_message = get_version_message()
+	ver_packet = build_packet("version", ver_message)
+	print_message(ver_packet)
+	
+	ver_response = message(ver_packet)
+	for msg in ver_response:
+		print_message(msg)
+	
+	# send the verack
+	verack_packet = build_packet("verack", "".encode())
+	verack_response = message(verack_packet, False)
 
-	complete = header + message
 
-	print_message(complete)
+def message(packet, wait_for_response=True):
+	"""
+	Send a message and receive the response
+	:param packet: the message to send to the node
+	:return: the list of payloads that the node responded with
+	"""
+	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+		sock.connect((BTC_HOST, BTC_PORT))
+		sock.sendall(packet)
+		
+		if wait_for_response:
+			response = sock.recv(BUFFER_SIZE)
+			
+			curr = 0
+			payloads = []
+			
+			# split the message into individual payloads
+			payload_size = unmarshal_uint(response[16:20])
+			while curr < len(response):
+				payloads.append(response[curr:curr+HDR_SZ+payload_size])
+				curr += payload_size + HDR_SZ
+				if curr < len(response):
+					payload_size = unmarshal_uint(response[payload_size+16:payload_size+20])
+				
+			return payloads
 
 
 def checksum(payload):
+	"""
+	Double hashes a payload to get a checksum
+	:param payload: the payload to hash
+	:return: the first four bytes of the resulting hash
+	"""
 	return hashlib.sha256(hashlib.sha256(payload).digest()).digest()[0:4]
 
 
-def get_header(cmd_name, payload):
+def build_packet(cmd_name, payload):
 	"""
 	Constructs a Bitcoin message header
 	:param cmd_name: the command to send
@@ -51,7 +90,7 @@ def get_header(cmd_name, payload):
 
 	payload_size = uint32_t(len(payload))
 
-	return START_STRING + command + bytes(payload_size) + checksum(payload)
+	return START_STRING + command + payload_size + checksum(payload) + payload
 
 
 def get_version_message():
@@ -68,10 +107,10 @@ def get_version_message():
 	addr_trans_services = services
 	addr_trans = ipv6_from_ipv4("127.0.0.1")
 	addr_trans_port = uint16_t(BTC_PORT)
-	nonce = uint64_t(random.randint(20000, 30000))
-	user_agent_bytes = '\0'.encode()
+	nonce = uint64_t(0)
+	user_agent_bytes = compactsize_t(0)
 	start_height = uint32_t(0)
-	relay = '\0'.encode()
+	relay = bool_t(False)
 
 	recv = addr_recv_services + addr_recv + addr_recv_port
 	trans = addr_trans_services + addr_trans + addr_trans_port
