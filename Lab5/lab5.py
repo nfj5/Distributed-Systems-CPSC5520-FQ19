@@ -31,15 +31,26 @@ def run():
 	# send the version message
 	ver_message = get_version_message()
 	ver_packet = build_packet("version", ver_message)
+	
+	print ("Sent...")
 	print_message(ver_packet)
 	
 	ver_response = message(ver_packet)
 	for msg in ver_response:
+		print ("\nReceived...")
 		print_message(msg)
 	
-	# send the verack
-	verack_packet = build_packet("verack", "".encode())
-	verack_response = message(verack_packet, False)
+	block_message = get_block_message()
+	block_packet = build_packet("getblocks", block_message)
+	
+	print("Sent...")
+	print_message(block_packet)
+	
+	block_response = message(block_packet)
+	for msg in block_response:
+		print("\nReceived...")
+		print_message(msg)
+	
 
 
 def message(packet, wait_for_response=True):
@@ -116,6 +127,21 @@ def get_version_message():
 	trans = addr_trans_services + addr_trans + addr_trans_port
 
 	return version + services + timestamp + recv + trans + nonce + user_agent_bytes + start_height + relay
+	
+def get_block_message():
+	"""
+	Generates a block request message to send to a node
+	:param block_num: the block number to request from the node
+	:returns: the constructed block message
+	"""
+	# send inventory message of block header
+	# message type: MSG_FILTERED_BLOCK to get Merkle block
+	version = uint32_t(VERSION)
+	count = compactsize_t(1)
+	data_type = uint8_t(3) # MSG_FILTERED_BLOCK
+	data_hash = hashlib.sha256(BLOCK_NUMBER.to_bytes(32, byteorder='little')).digest()
+	
+	return count + data_type + data_hash
 
 
 def compactsize_t(n):
@@ -194,6 +220,8 @@ def print_message(msg, text=None):
 	command = print_header(msg[:HDR_SZ], checksum(payload))
 	if command == 'version':
 		print_version_msg(payload)
+	elif command == 'getblocks':
+		print_blocks_msg(payload)
 	# FIXME print out the payloads of other types of messages, too
 	return command
 
@@ -236,6 +264,18 @@ def print_version_msg(b):
 	print('{}{:32} relay {}'.format(prefix, relay.hex(), bytes(relay) != b'\0'))
 	if len(extra) > 0:
 		print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
+		
+
+def print_blocks_msg(b):
+	"""
+	Report the contents of the given bitcoin getblocks message (sans the header)
+	:param payload: getblocks message contents
+	"""
+	version, count, hashes = b[:4], b[4:6], b[6:]
+	count = unmarshal_compactsize(count)
+	
+	for i in range(count):
+		pass
 
 
 def print_header(header, expected_cksum=None):
