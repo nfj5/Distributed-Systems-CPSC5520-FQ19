@@ -6,14 +6,10 @@ Collaborated with Pabi
 :Version: fq19-01
 """
 
-from time import strftime, gmtime
-
+import hashlib
 import socket
 import time
-import random
-import struct
-import hashlib
-import binascii
+from time import strftime, gmtime
 
 BUFFER_SIZE = 4096
 
@@ -31,26 +27,25 @@ def run():
 	# send the version message
 	ver_message = get_version_message()
 	ver_packet = build_packet("version", ver_message)
-	
-	print ("Sent...")
+
+	print("Sent...")
 	print_message(ver_packet)
-	
+
 	ver_response = message(ver_packet)
 	for msg in ver_response:
-		print ("\nReceived...")
+		print("\nReceived...")
 		print_message(msg)
-	
+
 	block_message = get_block_message()
 	block_packet = build_packet("getblocks", block_message)
-	
+
 	print("Sent...")
 	print_message(block_packet)
-	
+
 	block_response = message(block_packet)
 	for msg in block_response:
 		print("\nReceived...")
 		print_message(msg)
-	
 
 
 def message(packet, wait_for_response=True):
@@ -62,21 +57,21 @@ def message(packet, wait_for_response=True):
 	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
 		sock.connect((BTC_HOST, BTC_PORT))
 		sock.sendall(packet)
-		
+
 		if wait_for_response:
 			response = sock.recv(BUFFER_SIZE)
-			
+
 			curr = 0
 			payloads = []
-			
+
 			# split the message into individual payloads
 			payload_size = unmarshal_uint(response[16:20])
 			while curr < len(response):
-				payloads.append(response[curr:curr+HDR_SZ+payload_size])
+				payloads.append(response[curr:curr + HDR_SZ + payload_size])
 				curr += payload_size + HDR_SZ
 				if curr < len(response):
-					payload_size = unmarshal_uint(response[payload_size+16:payload_size+20])
-				
+					payload_size = unmarshal_uint(response[payload_size + 16:payload_size + 20])
+
 			return payloads
 
 
@@ -127,20 +122,20 @@ def get_version_message():
 	trans = addr_trans_services + addr_trans + addr_trans_port
 
 	return version + services + timestamp + recv + trans + nonce + user_agent_bytes + start_height + relay
-	
+
+
 def get_block_message():
 	"""
 	Generates a block request message to send to a node
-	:param block_num: the block number to request from the node
 	:returns: the constructed block message
 	"""
 	# send inventory message of block header
 	# message type: MSG_FILTERED_BLOCK to get Merkle block
 	version = uint32_t(VERSION)
 	count = compactsize_t(1)
-	data_type = uint8_t(3) # MSG_FILTERED_BLOCK
+	data_type = uint8_t(3)  # MSG_FILTERED_BLOCK
 	data_hash = hashlib.sha256(BLOCK_NUMBER.to_bytes(32, byteorder='little')).digest()
-	
+
 	return count + data_type + data_hash
 
 
@@ -264,7 +259,7 @@ def print_version_msg(b):
 	print('{}{:32} relay {}'.format(prefix, relay.hex(), bytes(relay) != b'\0'))
 	if len(extra) > 0:
 		print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
-		
+
 
 def print_blocks_msg(b):
 	"""
@@ -273,7 +268,7 @@ def print_blocks_msg(b):
 	"""
 	version, count, hashes = b[:4], b[4:6], b[6:]
 	count = unmarshal_compactsize(count)
-	
+
 	for i in range(count):
 		pass
 
