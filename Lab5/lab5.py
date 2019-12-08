@@ -15,42 +15,60 @@ import struct
 import hashlib
 import binascii
 
-BUFFER_SIZE = 4096
+BUFFER_SIZE = int(2e6) # bitcoin MAX_SIZE
 
-BTC_HOST = "185.216.140.33"
+BTC_HOST = "51.15.95.161"
 BTC_PORT = 8333
 VERSION = 70015
 
 START_STRING = bytearray.fromhex("f9beb4d9")
 HDR_SZ = 24
 
-BLOCK_NUMBER = 2146346 % 600000
+BLOCK_NUMBER = 2146346 % 600000 # 346346
 
 
 def run():
-	# send the version message
+	# build the version message
 	ver_message = get_version_message()
 	ver_packet = build_packet("version", ver_message)
+		
+	# build the verack message
+	verack_packet = build_packet("verack", "".encode())
 	
-	print ("Sent...")
-	print_message(ver_packet)
-	
-	ver_response = message(ver_packet)
-	for msg in ver_response:
-		print ("\nReceived...")
-		print_message(msg)
-	
+	# build the getblocks message
 	block_message = get_block_message()
 	block_packet = build_packet("getblocks", block_message)
 	
-	print("Sent...")
-	print_message(block_packet)
+	# put the verack and block packets together
+	first_package = ver_packet + verack_packet + block_packet
 	
-	block_response = message(block_packet)
-	for msg in block_response:
-		print("\nReceived...")
+	for msg in split_message(first_package):
+		print("\nSent:")
 		print_message(msg)
 	
+	# process responses
+	first_response = message(first_package)
+	for msg in first_response:
+		print("\nReceived:")
+		print_message(msg)
+	
+
+def split_message(packet):
+	"""
+	Takes a bytestream and splits it into individual messages
+	:param packet: the bytestream to be split
+	:return: a list of individual messages
+	"""
+	curr = 0
+	messages = []
+	
+	# split the message into individual payloads
+	while curr < len(packet):
+		payload_size = unmarshal_uint(packet[curr+16:curr+20])
+		messages.append(packet[curr:curr+HDR_SZ+payload_size])
+		curr += payload_size + HDR_SZ
+			
+	return messages
 
 
 def message(packet, wait_for_response=True):
@@ -65,19 +83,7 @@ def message(packet, wait_for_response=True):
 		
 		if wait_for_response:
 			response = sock.recv(BUFFER_SIZE)
-			
-			curr = 0
-			payloads = []
-			
-			# split the message into individual payloads
-			payload_size = unmarshal_uint(response[16:20])
-			while curr < len(response):
-				payloads.append(response[curr:curr+HDR_SZ+payload_size])
-				curr += payload_size + HDR_SZ
-				if curr < len(response):
-					payload_size = unmarshal_uint(response[payload_size+16:payload_size+20])
-				
-			return payloads
+			return split_message(response)
 
 
 def checksum(payload):
@@ -138,10 +144,10 @@ def get_block_message():
 	# message type: MSG_FILTERED_BLOCK to get Merkle block
 	version = uint32_t(VERSION)
 	count = compactsize_t(1)
-	data_type = uint8_t(3) # MSG_FILTERED_BLOCK
-	data_hash = hashlib.sha256(BLOCK_NUMBER.to_bytes(32, byteorder='little')).digest()
+	header_hash = bytearray(32)
+	end_hash = bytearray(32)
 	
-	return count + data_type + data_hash
+	return version + count + header_hash + end_hash
 
 
 def compactsize_t(n):
@@ -222,6 +228,8 @@ def print_message(msg, text=None):
 		print_version_msg(payload)
 	elif command == 'getblocks':
 		print_blocks_msg(payload)
+	elif command == 'inv':
+		print("inv")
 	# FIXME print out the payloads of other types of messages, too
 	return command
 
@@ -271,11 +279,16 @@ def print_blocks_msg(b):
 	Report the contents of the given bitcoin getblocks message (sans the header)
 	:param payload: getblocks message contents
 	"""
-	version, count, hashes = b[:4], b[4:6], b[6:]
-	count = unmarshal_compactsize(count)
+	version, count, header_hash, end_hash = b[:4], b[4:5], b[5:37], b[37:]
+	prefix = '  '
 	
-	for i in range(count):
-		pass
+	print(prefix + 'GETBLOCKS')
+	print(prefix + '-' * 56)
+	prefix *= 2
+	print('{}{:32} version {}'.format(prefix, version.hex(), unmarshal_int(version)))
+	print('{}{:32} count {}'.format(prefix, count.hex(), unmarshal_compactsize(count)[1]))
+	print('{}{:32} header hash'.format(prefix, header_hash.hex()[:32]))
+	print('{}{:32} end hash'.format(prefix, end_hash.hex()[:32]))
 
 
 def print_header(header, expected_cksum=None):
