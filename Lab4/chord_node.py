@@ -249,6 +249,7 @@ if __name__ == '__main__':
 	# address = (sys.argv[1], int(sys.argv[2]))
 	if len(sys.argv) < 2:
 		print("Usage: python chord_node.py [node_id] [optional: known_id]")
+		exit()
 		
 	node_id = int(sys.argv[1])
 	print("Creating node with ID {}".format(node_id))
